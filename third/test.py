@@ -3,12 +3,11 @@ import numpy as np
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-x = Variable(np.array(0.5))
-y = square(exp(square(x)))
-y.backward()
-print(x.grad)
-
-
+xs = [Variable(np.array(2)), Variable(np.array(3))]
+f = Add()
+ys = f(xs)
+y = ys[0]
+print(y.data)
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

@@ -29,14 +29,16 @@ class Variable:
                 funcs.append(x.creator)
 
 class Function:
-    def __call__(self, input):          # f = Function() 형태로 함수의 인스턴스를 변수 f에 대입 가능    / input 은 Variable 인스턴스라 가정
-        x = input.data                  # 데이터를 꺼낸다
-        y = self.forward(x)
-        output = Variable(np.array(y))  # step09    / np.ndarray 연산 이후 np.float으로 변경되어서 Variable의 데이터 타입에서 오류 발생 가능하므로 타입 지정
-        output.set_creator(self)        # step07    / 출력 변수에 창조자 설정
-        self.input = input              # step06    / 입력 변수 기억(보관)  / 함수의 앞, 뒤 관계 기억
-        self.output = output            # step07    / f1(x) = output -> f2(output) = y  여기서 "->"이 관계가 output에 들어있다.
-        return output
+    def __call__(self, inputs):             # f = Function() 형태로 함수의 인스턴스를 변수 f에 대입 가능    / input 은 Variable 인스턴스라 가정
+        xs = [x.data for x in inputs]       # step11    / 가변 길이에 대한 처리
+        ys = self.forward(xs)
+        outputs = [Variable(np.array(y)) for y in ys]
+
+        for output in outputs:
+            output.set_creator(self)
+        self.inputs = inputs
+        self.outputs = outputs
+        return outputs
 
     def forward(self, x):
         raise NotImplementedError()     # 구체적 로직은 하위 클래스에서 구현
@@ -71,6 +73,13 @@ class Exp(Function):
 
 def exp(x):
     return Exp()(x)
+
+class Add(Function):
+    def forward(self, xs):
+        x0, x1 = xs
+        y = x0 + x1
+        return y,                     # step11    / 튜플 형태로 반환
+    
 
 #  utils
 def numerical_diff(f, x, eps=1e-4):     # 중앙차분 : centered difference
