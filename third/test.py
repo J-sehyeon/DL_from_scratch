@@ -3,11 +3,10 @@ import numpy as np
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-xs = [Variable(np.array(2)), Variable(np.array(3))]
-f = Add()
-ys = f(xs)
-y = ys[0]
-print(y.data)
+x = Variable(np.array(3))
+y = add(add(x, x), x)
+y.backward()    
+print(x.grad)
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
