@@ -1,31 +1,46 @@
 import numpy as np
+import weakref
+import contextlib
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 class Variable:
-    def __init__(self, data):
+    def __init__(self, data, name=None):
         if data is not None:
             if not isinstance(data, np.ndarray):        # step09    / data의 type을 np.ndarray로 한정
                 raise TypeError(f'{type(data)}은(는) 지원하지 않습니다.')
             
         self.data = data    
+        self.name = name                # step19    / 수많은 변수들을 구분하기 위한 이름
         self.grad = None                # 인스턴스 변수인 data와 grad는 모두 넘파이의 다차원 배열인 ndarray이라고 가정한다.
         self.creator = None             # step07    / 변수의 창조자(함수 혹은 사용자)를 지정, 저장
+        self.generation = 0             # step16    / layer와 같은 개념
     
     def set_creator(self, func):        # step07    / creator 인스턴스 변수를 설정하는 메서드
         self.creator = func             # 변수와 함수를 연결한다.
+        self.generation = func.generation + 1       # step16    / 함수에 의해 생성된 변수의 세대는 함수의 세대 + 1
     
     def cleargrad(self):                # step14    / 변수 x를 서로 다른 두 계산에 사용할 경우 x.grad를 공유하므로 이를 방지하기 위한 메서드
         self.grad = None
     
-    def backward(self):
+    def backward(self, retain_grad=False):
         if self.grad is None:
             self.grad = np.ones_like(self.data)     # step09    / y.grad = np.array(1.0) 자동화, data와 grad의 데이터 타입(비트수) 통일
 
-        funcs = [self.creator]          # step08    / 반복문 형식의 역전파
+        funcs = []
+        seen_set = set()                # step16    / 2개 이상을 리턴하는 함수에 대해 그 함수를 중복해서 funcs리스트에 넣지 않기 위함
+
+        def add_func(f):
+            if f not in seen_set:
+                funcs.append(f)
+                seen_set.add(f)
+                funcs.sort(key=lambda x: x.generation)
+        
+        add_func(self.creator)
+
         while funcs:
             f = funcs.pop()             # step08    / 리스트에서 마지막 원소를 리턴 후 제거
-            gys = [output.grad for output in f.outputs]
+            gys = [output().grad for output in f.outputs]       # step17    / 함수의 output은 전부 약한 참조이므로 값을 불러오기 위해 "()"를 붙여야한다.
             gxs = f.backward(*gys)
             if not isinstance(gxs, tuple):
                 gxs = (gxs,)
@@ -37,7 +52,35 @@ class Variable:
                     x.grad = x.grad + gx    # step14    / +=는 in-place연산이다. 이는 새로운 메모리 위치를 생성하지 않아 주소가 복사되는 위험이 있다.
 
                 if x.creator is not None:
-                    funcs.append(x.creator)
+                    add_func(x.creator)     # step16    / 수정 전: func.append(x.creator)
+            if not retain_grad:
+                for y in f.outputs:
+                    y().grad = None         
+    
+    @property                           # step19    / ndarray 인스턴스 변수
+    def shape(self):
+        return self.data.shape
+    
+    @property
+    def ndim(self):
+        return self.data.ndim
+    
+    @property
+    def size(self):
+        return self.data.size
+    
+    @property
+    def dtype(self):
+        return self.data.dtype
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def __repr__(self):
+        if self.data is None:
+            return 'variable(None)'
+        p = str(self.data).replace('\n', '\n' + ' '*9)
+        return 'variable(' + p + ')'
 
 class Function:                             # step12    / 가변 길이 변수에 대한 처리 적용
     def __call__(self, *inputs):            # f = Function() 형태로 함수의 인스턴스를 변수 f에 대입 가능    / input 은 Variable 인스턴스라 가정
@@ -47,10 +90,13 @@ class Function:                             # step12    / 가변 길이 변수�
             ys = (ys,)
         outputs = [Variable(np.array(y)) for y in ys]
 
-        for output in outputs:
-            output.set_creator(self)
-        self.inputs = inputs
-        self.outputs = outputs
+        if Config.enable_backprop:          # step18    / 순전파만 할 경우 역전파를 위한 데이터 저장 x  
+            self.generation = max([x.generation for x in inputs])
+            for output in outputs:
+                output.set_creator(self)
+            self.inputs = inputs
+            self.outputs = [weakref.ref(output) for output in outputs]      # step17    / 약한 참조 도입으로 순환 참조에 의한 메모리 누적을 제거
+
         return outputs if len(outputs) > 1 else outputs[0]
 
     def forward(self, x):
@@ -106,3 +152,17 @@ def numerical_diff(f, x, eps=1e-4):     # 중앙차분 : centered difference
     y1 = f(x1)
     return (y1.data - y0.data) / (2 * eps)
 
+class Config:                           # step18    / 설정 데이터는 한 군데에만 존재하는게 좋다. 인스턴스 생성 x
+    enable_backprop = True
+
+@contextlib.contextmanager
+def using_config(name, value):
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+def no_grad():
+    return using_config('enable_backprop', False)

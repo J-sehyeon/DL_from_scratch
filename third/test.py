@@ -3,10 +3,12 @@ import numpy as np
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-x = Variable(np.array(3))
-y = add(add(x, x), x)
-y.backward()    
-print(x.grad)
+x = Variable(np.array([1, 2, 3]))
+print(x)
 
+x = Variable(None)
+print(x)
 
+x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
+print(x)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
