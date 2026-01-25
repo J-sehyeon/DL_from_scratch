@@ -5,6 +5,7 @@ import contextlib
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 class Variable:
+    __array_priority__ = 200            # step21    / ndarray와 Variable 인스턴스의 연산에서 Variable 인스턴스의 연산자 메서드가 우선적으로 호출
     def __init__(self, data, name=None):
         if data is not None:
             if not isinstance(data, np.ndarray):        # step09    / data의 type을 np.ndarray로 한정
@@ -81,9 +82,12 @@ class Variable:
             return 'variable(None)'
         p = str(self.data).replace('\n', '\n' + ' '*9)
         return 'variable(' + p + ')'
+    
+
 
 class Function:                             # step12    / 가변 길이 변수에 대한 처리 적용
     def __call__(self, *inputs):            # f = Function() 형태로 함수의 인스턴스를 변수 f에 대입 가능    / input 은 Variable 인스턴스라 가정
+        inputs = [as_variable(x) for x in inputs]
         xs = [x.data for x in inputs]       # step11    / 가변 길이에 대한 처리
         ys = self.forward(*xs)              # step12    / 리스트 언팩 : *xs == x0, x1
         if not isinstance(ys, tuple):
@@ -133,6 +137,7 @@ class Exp(Function):
 def exp(x):
     return Exp()(x)
 
+# 기본 연산자
 class Add(Function):
     def forward(self, x0, x1):
         y = x0 + x1
@@ -141,8 +146,93 @@ class Add(Function):
         return gy, gy
     
 def add(x0, x1):
+    x1 = np.array(x1)
     return Add()(x0, x1)
+
+class Mul(Function):
+    def forward(self, x0 ,x1):
+        y = x0 * x1
+        return y
     
+    def backward(self, gy):
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        return gy * x1, gy * x0
+
+def mul(x0, x1):
+    return Mul()(x0, x1)
+
+class Neg(Function):
+    def forward(self, x):
+        return -x
+    
+    def backward(self, gy):
+        return -gy
+
+def neg(x):
+    return Neg()(x)
+
+class Sub(Function):
+    def forward(self, x0, x1):
+        y = x0 - x1
+        return y
+    
+    def backward(self, gy):
+        return gy, -gy
+
+def sub(x0, x1):
+    x1 = np.array(x1)
+    return Sub()(x0, x1)
+def rsub(x0, x1):
+    x1 = np.array(x1)
+    return Sub()(x1, x0)
+
+class Div(Function):
+    def forward(self, x0, x1):
+        y = x0 / x1
+        return y
+    
+    def backward(self, gy):
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        gx0 = gy / x1
+        gx1 = gy * (-x0 / x1 ** 2)
+        return gx0, gx1
+
+def div(x0, x1):
+    x1 = np.array(x1)
+    return Div()(x0, x1)
+def rdiv(x0, x1):
+    x1 = np.array(x1)
+    return Div()(x1, x0)
+
+class Pow(Function):
+    def __init__(self, c):
+        self.c = c
+    
+    def forward(self, x):
+        y = x ** self.c
+        return y
+    
+    def backward(self, gy):
+        x = self.input[0].data
+        c = self.c
+        gx = c * x ** (c - 1) * gy
+        return gx
+
+def pow(x, c):
+    return Pow(c)(x)
+
+    
+# operator overload
+Variable.__add__ = add
+Variable.__radd__ = add
+Variable.__mul__ = mul
+Variable.__rmul__ = mul
+Variable.__neg__ = neg
+Variable.__sub__ = sub
+Variable.__rsub__ = rsub
+Variable.__truediv__ = div
+Variable.__rtruediv__ = rdiv
+Variable.__pow__ = pow
 
 #  utils
 def numerical_diff(f, x, eps=1e-4):     # 중앙차분 : centered difference
@@ -166,3 +256,9 @@ def using_config(name, value):
 
 def no_grad():
     return using_config('enable_backprop', False)
+
+def as_variable(obj):
+    if isinstance(obj, Variable):
+        return obj
+    return Variable(obj)
+
