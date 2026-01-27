@@ -3,7 +3,6 @@ import weakref
 import contextlib
 
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 class Variable:
     __array_priority__ = 200            # step21    / ndarray와 Variable 인스턴스의 연산에서 Variable 인스턴스의 연산자 메서드가 우선적으로 호출
     def __init__(self, data, name=None):
@@ -36,6 +35,7 @@ class Variable:
                 funcs.append(f)
                 seen_set.add(f)
                 funcs.sort(key=lambda x: x.generation)
+
         
         add_func(self.creator)
 
@@ -45,7 +45,6 @@ class Variable:
             gxs = f.backward(*gys)
             if not isinstance(gxs, tuple):
                 gxs = (gxs,)
-            
             for x, gx in zip(f.inputs, gxs):
                 if x.grad is None:
                     x.grad = gx
@@ -54,6 +53,7 @@ class Variable:
 
                 if x.creator is not None:
                     add_func(x.creator)     # step16    / 수정 전: func.append(x.creator)
+                    
             if not retain_grad:
                 for y in f.outputs:
                     y().grad = None         
@@ -92,7 +92,7 @@ class Function:                             # step12    / 가변 길이 변수�
         ys = self.forward(*xs)              # step12    / 리스트 언팩 : *xs == x0, x1
         if not isinstance(ys, tuple):
             ys = (ys,)
-        outputs = [Variable(np.array(y)) for y in ys]
+        outputs = [Variable(as_array(y)) for y in ys]
 
         if Config.enable_backprop:          # step18    / 순전파만 할 경우 역전파를 위한 데이터 저장 x  
             self.generation = max([x.generation for x in inputs])
@@ -109,44 +109,17 @@ class Function:                             # step12    / 가변 길이 변수�
     def backward(self, gy):
         raise NotImplementedError
 
-# Function 하위 클래스
-class Square(Function):
-    def forward(self, x):
-        y = x ** 2
-        return y
-    
-    def backward(self, gy):
-        x = self.inputs[0].data
-        gx = 2 * x * gy                 # steo06    / 앞선 노드에서 온 미분값에 자기 자신의 미분값을 곱해 뒤로 보낸다.
-        return gx
-
-def square(x):                          # step09    / 함수 사용 편의성 개선
-    return Square()(x)
-
-
-class Exp(Function):
-    def forward(self, x):
-        y = np.exp(x)
-        return y
-    
-    def backward(self, gy):
-        x = self.input.data
-        gx = np.exp(x) * gy
-        return gx
-
-def exp(x):
-    return Exp()(x)
-
 # 기본 연산자
 class Add(Function):
     def forward(self, x0, x1):
         y = x0 + x1
-        return y                      # step11    / 튜플 형태로 반환 -> stpe12 : 리스트에서 원소를 뽑아내고 이후에 리스트로 만드는 과정을 상위 클래스에서 지원
+        return y                        # step11    / 튜플 형태로 반환 -> stpe12 : 리스트에서 원소를 뽑아내고 이후에 리스트로 만드는 과정을 상위 클래스에서 지원
+    
     def backward(self, gy):
         return gy, gy
     
 def add(x0, x1):
-    x1 = np.array(x1)
+    x1 = as_array(x1)                   # step21
     return Add()(x0, x1)
 
 class Mul(Function):
@@ -159,6 +132,7 @@ class Mul(Function):
         return gy * x1, gy * x0
 
 def mul(x0, x1):
+    x1 = as_array(x1)
     return Mul()(x0, x1)
 
 class Neg(Function):
@@ -180,7 +154,7 @@ class Sub(Function):
         return gy, -gy
 
 def sub(x0, x1):
-    x1 = np.array(x1)
+    x1 = as_array(x1)
     return Sub()(x0, x1)
 def rsub(x0, x1):
     x1 = np.array(x1)
@@ -213,26 +187,13 @@ class Pow(Function):
         return y
     
     def backward(self, gy):
-        x = self.input[0].data
+        x = self.inputs[0].data
         c = self.c
         gx = c * x ** (c - 1) * gy
         return gx
 
 def pow(x, c):
     return Pow(c)(x)
-
-    
-# operator overload
-Variable.__add__ = add
-Variable.__radd__ = add
-Variable.__mul__ = mul
-Variable.__rmul__ = mul
-Variable.__neg__ = neg
-Variable.__sub__ = sub
-Variable.__rsub__ = rsub
-Variable.__truediv__ = div
-Variable.__rtruediv__ = rdiv
-Variable.__pow__ = pow
 
 #  utils
 def numerical_diff(f, x, eps=1e-4):     # 중앙차분 : centered difference
@@ -257,9 +218,25 @@ def using_config(name, value):
 def no_grad():
     return using_config('enable_backprop', False)
 
+def as_array(x):
+    if np.isscalar(x):
+        return np.array(x)
+    return x
+
 def as_variable(obj):
     if isinstance(obj, Variable):
         return obj
     return Variable(obj)
 
-
+# operator overload
+def setup_variable():
+    Variable.__add__ = add
+    Variable.__radd__ = add
+    Variable.__mul__ = mul
+    Variable.__rmul__ = mul
+    Variable.__neg__ = neg
+    Variable.__sub__ = sub
+    Variable.__rsub__ = rsub
+    Variable.__truediv__ = div
+    Variable.__rtruediv__ = rdiv
+    Variable.__pow__ = pow

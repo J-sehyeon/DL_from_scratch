@@ -1,11 +1,10 @@
-from main import *
+from dezero.core_simple import Variable
 import numpy as np
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 a = Variable(np.array(3.0))
-y = 3 ** a
-
-print(y)
+b = 3.0 * a + 1.0
+print(b)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
