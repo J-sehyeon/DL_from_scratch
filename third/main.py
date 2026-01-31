@@ -138,6 +138,11 @@ class Exp(Function):
 def exp(x):
     return Exp()(x)
 
+def goldstein(x, y):
+    z = (1 + (x + y + 1)**2 * (19 - 14*x + 3*x**2 - 14*y + 6*x*y + 3*y**2)) * \
+         (30 + (2*x - 3*y)**2 * (18 - 32*x + 12*x**2 + 48*y - 36*x*y + 27*y**2))
+    return z
+
 class Sin(Function):                # step27
     def forward(self, x):
         y = np.sin(x)
@@ -220,7 +225,7 @@ def sub(x0, x1):
     x1 = as_array(x1)
     return Sub()(x0, x1)
 def rsub(x0, x1):
-    x1 = np.array(x1)
+    x1 = as_array(x1)
     return Sub()(x1, x0)
 
 class Div(Function):
@@ -235,10 +240,10 @@ class Div(Function):
         return gx0, gx1
 
 def div(x0, x1):
-    x1 = np.array(x1)
+    x1 = as_array(x1)
     return Div()(x0, x1)
 def rdiv(x0, x1):
-    x1 = np.array(x1)
+    x1 = as_array(x1)
     return Div()(x1, x0)
 
 class Pow(Function):

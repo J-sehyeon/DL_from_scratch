@@ -1,7 +1,8 @@
 if __name__ == "__main__":
-    from core_simple import *
+    from core import *
     import numpy as np
     setup_variable()
+    
 
 # step26    / 계산 그래프 시각화
 import os
