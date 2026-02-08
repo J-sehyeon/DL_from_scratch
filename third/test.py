@@ -9,23 +9,16 @@ import matplotlib.pyplot as plt
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-x = Variable(np.array(2.0))
-x.name = 'x'
-y = x ** 2
-y.nam = 'y'
-y.backward(create_graph=True)
-gx = x.grad
-gx.name = 'gx'
-x.cleargrad()
+x0 = Variable(np.array([1, 2, 3]))
+x1 = Variable(np.array([10]))
+y = x0 * x1
+print(y)
 
-z = gx ** 3 + y
-z.name = 'z'
+y.backward()
+print(x1.grad)
 
-z.backward()
-print(x.grad)
 
-print(x.generation, x.grad.generation, gx.generation)
 
-plot_dot_graph(z, verbose=False, to_file="third/chapter/compute_graph/double_back.png")
+
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
