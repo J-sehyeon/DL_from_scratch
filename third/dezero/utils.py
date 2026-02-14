@@ -88,9 +88,11 @@ def plot_dot_graph(output, verbose=True, to_file = 'graph.png'):
         return display.Image(filename=to_file, width=300, height=300)       # 사이즈 임의 조절
     except:
         pass
+
 # =============================================================================
 # Utility functions for numpy (numpy magic)
 # =============================================================================
+
 def sum_to(x, shape):
     """Sum elements along axes to output an array of a given shape.
     

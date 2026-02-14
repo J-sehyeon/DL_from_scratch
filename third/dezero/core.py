@@ -1,6 +1,7 @@
 import numpy as np
 import weakref
 import contextlib
+
 import dezero
 
 
@@ -8,7 +9,7 @@ class Variable:
     __array_priority__ = 200         
     def __init__(self, data, name=None):
         if data is not None:
-            if not isinstance(data, np.ndarray):      
+            if not isinstance(data, np.ndarray):     
                 raise TypeError(f'{type(data)}은(는) 지원하지 않습니다.')
             
         self.data = data    
@@ -131,6 +132,9 @@ class Function:
     
     def backward(self, gy):
         raise NotImplementedError
+
+class Parameter(Variable):
+    pass
 
 # 기본 연산자
 class Add(Function):
@@ -282,3 +286,5 @@ def setup_variable():
     Variable.__truediv__ = div
     Variable.__rtruediv__ = rdiv
     Variable.__pow__ = pow
+    
+    Variable.__getitem__ = dezero.functions.get_item
